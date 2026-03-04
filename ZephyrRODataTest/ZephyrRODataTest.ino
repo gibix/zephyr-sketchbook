@@ -1,56 +1,45 @@
 /*
-  Blink
+  ZephyrRODataTest
 
-  Turns an LED on for one second, then off for one second, repeatedly.
+  Tests LLEXT handling of large read-only data in the .rodata section.
+  Includes a ~37KB const array (rodata.h) to verify that:
+    - The LLEXT loader can allocate and map large rodata regions
+    - With CONFIG_LLEXT_RODATA_NO_RELOC=y, rodata stays in flash (no RAM copy)
+    - Without the zephyr patch "Skip MPU alignment if userspace disabled",
+      a region >32KB rounds to 64KB with 64KB alignment, which can exhaust
+      the 128KB LLEXT heap
 
-  Most Arduinos have an on-board LED you can control. On the UNO, MEGA and ZERO
-  it is attached to digital pin 13, on MKR1000 on pin 6. LED_BUILTIN is set to
-  the correct LED pin independent of which board is used.
-  If you want to know what pin the on-board LED is connected to on your Arduino
-  model, check the Technical Specs of your board at:
-  https://www.arduino.cc/en/Main/Products
+  Expected output:
+    === ZephyrRODataTest started ===
+    RANDOM_DATA address: 0x........     (flash address if NO_RELOC, RAM if copied)
+    RANDOM_DATA count: 1864
+    heartbeat: ability                  (cycles through words each loop)
 
-  modified 8 May 2014
-  by Scott Fitzgerald
-  modified 2 Sep 2016
-  by Arturo Guadalupi
-  modified 8 Sep 2016
-  by Colby Newman
-
-  This example code is in the public domain.
-
-  https://www.arduino.cc/en/Tutorial/BuiltInExamples/Blink
+  If no output at all: the LLEXT module likely failed to load.
+  Check with CONFIG_LLEXT_LOG_LEVEL_DBG=y in loader/prj.conf.
 */
 
-extern void crash(void);
-
-#include <zephyr/logging/log.h>
 #include "rodata.h"
-LOG_MODULE_DECLARE(sketch, LOG_LEVEL_WRN);
 
-static uint64_t i = 0;
+static size_t idx = 0;
 
-// the setup function runs once when you press reset or power the board
 void setup() {
-  // initialize digital pin LED_BUILTIN as an output.
-  Serial.begin(115200);
-  while (!Serial);
-  delay(100);
   pinMode(LED_BUILTIN, OUTPUT);
+  delay(1000); // wait for USB CDC enumeration
 
-  Serial.println("=== RODATA_NO_RELOC Test ===");
-  Serial.print("cacert RANDOM_DATA: 0x");
-  Serial.println((uintptr_t)RANDOM_DATA, HEX);
+  printk("=== ZephyrRODataTest started ===\n");
+  printk("RANDOM_DATA address: 0x%lx\n", (uintptr_t)RANDOM_DATA);
+  printk("RANDOM_DATA count: %zu\n", RANDOM_DATA_COUNT);
 }
 
-// the loop function runs over and over again forever
 void loop() {
-  digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
-  delay(1000);                      // wait for a second
-  digitalWrite(LED_BUILTIN, LOW);   // turn the LED off by making the voltage LOW
-  delay(1000);                      // wait for a second
-  printk("pippo\n\r");
-  LOG_WRN("logging\n\r");
-  Serial.println(RANDOM_DATA[++i]);
-  //crash();
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(1000);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(1000);
+
+  if (idx >= RANDOM_DATA_COUNT) {
+    idx = 0;
+  }
+  printk("heartbeat: %s\n", RANDOM_DATA[idx++]);
 }

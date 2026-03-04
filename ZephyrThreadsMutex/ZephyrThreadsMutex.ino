@@ -1,3 +1,23 @@
+/*
+  ZephyrThreadsMutex
+
+  Tests Zephyr kernel mutex from an LLEXT sketch. Creates two background
+  threads that compete for a shared mutex. Each thread holds the mutex
+  for 1 second, then releases it and sleeps for 1 second.
+
+  Expected output (via printk on zephyr,console):
+    === ZephyrThreadsMutex started ===
+    Thread 1 is accessing the shared resource
+    Thread 2 is accessing the shared resource
+    Thread 1 is accessing the shared resource
+    ...  (alternating every ~1 second)
+
+  Verifies:
+    - K_MUTEX_DEFINE works in LLEXT context
+    - k_mutex_lock / k_mutex_unlock provide mutual exclusion
+    - Multiple LLEXT-created threads can share a mutex
+*/
+
 K_MUTEX_DEFINE(my_mutex);
 
 void thread1(void *p1, void *p2, void *p3)
@@ -40,10 +60,9 @@ void setup() {
   thread2_tid = k_thread_create(&thread2_data, thread2_stack, K_THREAD_STACK_SIZEOF(thread2_stack),
     thread2, NULL, NULL, NULL, PRIORITY, 0, K_NO_WAIT);
 
-
+  printk("=== ZephyrThreadsMutex started ===\n");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   k_msleep(1);
 }

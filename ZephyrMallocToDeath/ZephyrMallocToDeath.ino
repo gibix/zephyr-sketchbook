@@ -1,48 +1,54 @@
 /*
-  Blink
+  ZephyrMallocToDeath
 
-  Turns an LED on for one second, then off for one second, repeatedly.
+  Stress-tests heap allocation by calling malloc(1KB) in a loop until
+  it fails. Useful for determining the effective heap size available
+  to sketches at runtime.
 
-  Most Arduinos have an on-board LED you can control. On the UNO, MEGA and ZERO
-  it is attached to digital pin 13, on MKR1000 on pin 6. LED_BUILTIN is set to
-  the correct LED pin independent of which board is used.
-  If you want to know what pin the on-board LED is connected to on your Arduino
-  model, check the Technical Specs of your board at:
-  https://www.arduino.cc/en/Main/Products
+  Expected output:
+    === ZephyrMallocToDeath started ===
+    [1] malloc(1024) = 0x20012340
+    [2] malloc(1024) = 0x20012740
+    ...
+    [N] malloc(1024) = (nil) -- heap exhausted after N-1 KB
 
-  modified 8 May 2014
-  by Scott Fitzgerald
-  modified 2 Sep 2016
-  by Arturo Guadalupi
-  modified 8 Sep 2016
-  by Colby Newman
+  The LED blinks fast (50ms) on each allocation. When malloc returns NULL,
+  the sketch keeps running but stops allocating (LED still blinks).
 
-  This example code is in the public domain.
-
-  https://www.arduino.cc/en/Tutorial/BuiltInExamples/Blink
+  Note: memory is intentionally never freed to find the limit.
+  CONFIG_COMMON_LIBC_MALLOC_ARENA_SIZE=-1 uses all remaining RAM for heap.
 */
 
-// the setup function runs once when you press reset or power the board
 void setup() {
-
   Serial.begin(115200);
   while (!Serial);
-  // initialize digital pin LED_BUILTIN as an output.
   pinMode(LED_BUILTIN, OUTPUT);
+  printk("=== ZephyrMallocToDeath started ===\n");
 }
 
-// the loop function runs over and over again forever
+static int i = 0;
+static bool exhausted = false;
+
 void loop() {
-  static int i = 1;
-  void* buffer1 = malloc(1 * 1024);
-  if (buffer1) {
-    Serial.println((uint32_t)buffer1,HEX);
-    Serial.println(i);
-    printk("Buffer: %p Iteration: %d\n", buffer1, i);
+  if (!exhausted) {
+    i++;
+    void *buf = malloc(1024);
+    if (buf) {
+      printk("[%d] malloc(1024) = %p\n", i, buf);
+      Serial.print(i);
+      Serial.print(": 0x");
+      Serial.println((uint32_t)buf, HEX);
+    } else {
+      printk("[%d] malloc(1024) = (nil) -- heap exhausted after %d KB\n", i, i - 1);
+      Serial.print("Heap exhausted after ");
+      Serial.print(i - 1);
+      Serial.println(" KB");
+      exhausted = true;
+    }
   }
-  ++i;
-  digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
-  delay(50);                      // wait for a second
-  digitalWrite(LED_BUILTIN, LOW);   // turn the LED off by making the voltage LOW
-  delay(50);                      // wait for a second
+
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(50);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(50);
 }
