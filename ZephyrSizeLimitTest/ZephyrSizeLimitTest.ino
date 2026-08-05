@@ -12,21 +12,25 @@
   To test rejection, increase the payload by changing MARGIN to a negative
   value (e.g., -2048), which will push past the limit.
 
-  Board limits (CONFIG_LLEXT_HEAP_SIZE * 1024):
+  Board limits (CONFIG_LLEXT_HEAP_SIZE * 1024, read from each board's
+  variant .conf - NOT necessarily uniform within a chip family):
     niclasense:                  15 KB (15360)
     ek_ra8d1, frdm_mcxn947,
     frdm_rw612:                  32 KB (32768)
-    nano_matter:                 64 KB (65536)
-    giga, nano33ble, portentah7,
-    portentac33, opta, unoq:    128 KB (131072)
+    nano_matter, nano_connect:    64 KB (65536)
+    nano33ble, portentac33:     128 KB (131072)
+    giga, portentah7, opta,
+    unoq, nicla_vision:         256 KB (262144)
 */
 
 // LLEXT heap size per board (bytes)
-#if defined(ARDUINO_GIGA) || defined(ARDUINO_NANO33BLE) || \
-    defined(ARDUINO_PORTENTA_H7_M7) || defined(ARDUINO_PORTENTA_C33) || \
-    defined(ARDUINO_OPTA) || defined(ARDUINO_UNO_Q)
+#if defined(ARDUINO_GIGA) || defined(ARDUINO_PORTENTA_H7_M7) || \
+    defined(ARDUINO_OPTA) || defined(ARDUINO_UNO_Q) || \
+    defined(ARDUINO_NICLA_VISION)
+  #define LLEXT_HEAP_BYTES 262144
+#elif defined(ARDUINO_NANO33BLE) || defined(ARDUINO_PORTENTA_C33)
   #define LLEXT_HEAP_BYTES 131072
-#elif defined(ARDUINO_ARDUINO_NANO_MATTER)
+#elif defined(ARDUINO_ARDUINO_NANO_MATTER) || defined(ARDUINO_NANO_RP2040_CONNECT)
   #define LLEXT_HEAP_BYTES 65536
 #elif defined(ARDUINO_EK_RA8D1) || defined(ARDUINO_FRDM_MCXN947) || \
       defined(ARDUINO_FRDM_RW612)
@@ -38,8 +42,14 @@
 #endif
 
 // Overhead: .text + .rodata + .data + .bss excluding the payload array.
-// Measured at ~4000 bytes. Use 5120 (5KB) for safety margin.
-#define OVERHEAD 5120
+// Measured at ~4000 bytes on most boards, so 5120 (5KB) covers it with
+// margin - except UNO Q, whose core pulls in RPC/Arx support libraries
+// unconditionally, measured at ~24.4KB. Use 26624 (26KB) there.
+#if defined(ARDUINO_UNO_Q)
+  #define OVERHEAD 26624
+#else
+  #define OVERHEAD 5120
+#endif
 
 // Margin below the limit. Set to a negative value (e.g. -2048) to test
 // that the size check correctly rejects oversized sketches.
